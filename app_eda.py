@@ -306,7 +306,7 @@ class EDA:
 
         # 탭 5: 시각화
         with tabs[4]:
-            st.subheader("Bar Chart by Region and Year")
+            st.subheader("Population Change Analysis in Last 5 Years by Region")
 
             region_dict = {
                 "서울": "Seoul", "부산": "Busan", "대구": "Daegu", "인천": "Incheon", "광주": "Gwangju",
@@ -315,22 +315,56 @@ class EDA:
                 "경북": "Gyeongbuk", "경남": "Gyeongnam", "제주": "Jeju"
             }
 
-            df_viz = df[df['지역'] != '전국'].copy()
-            df_viz['Region_EN'] = df_viz['지역'].map(region_dict)
-            pivot = df_viz.pivot_table(index='Region_EN', columns='연도', values='인구', aggfunc='mean').fillna(0)
-            pivot = pivot.sort_index(axis=1)
+            df_local = df[df['지역'] != '전국'].copy()
+            df_local['Region_EN'] = df_local['지역'].map(region_dict)
 
-            fig, ax = plt.subplots(figsize=(14, 7))
-            colors = sns.color_palette("tab20", n_colors=len(pivot.columns))
-            pivot.plot.bar(ax=ax, stacked=False, color=colors)  # stacked=False로 그룹 막대그래프
+            latest_year = df_local['연도'].max()
+            year_5ago = latest_year - 5
 
-            ax.set_title("Population by Region and Year (Grouped Bar Chart)")
-            ax.set_xlabel("Region")
-            ax.set_ylabel("Population")
-            ax.legend(title="Year", bbox_to_anchor=(1.05, 1), loc='upper left')
-            plt.xticks(rotation=45)
+            recent_df = df_local[df_local['연도'].between(year_5ago, latest_year)]
 
-            st.pyplot(fig)
+            pivot_pop = recent_df.pivot_table(index='Region_EN', columns='연도', values='인구', aggfunc='mean').fillna(0)
+
+            pivot_pop['Change'] = pivot_pop[latest_year] - pivot_pop[year_5ago]
+            pivot_pop['ChangeRate'] = (pivot_pop['Change'] / pivot_pop[year_5ago]) * 100
+
+            pivot_pop = pivot_pop.sort_values(by='Change', ascending=False)
+
+            # 인구 변화량 그래프
+            fig1, ax1 = plt.subplots(figsize=(10, 6))
+            sns.barplot(x=pivot_pop['Change'] / 1000, y=pivot_pop.index, ax=ax1, palette='viridis')
+            ax1.set_title('Population Change in Last 5 Years by Region')
+            ax1.set_xlabel('Population Change (thousands)')
+            ax1.set_ylabel('Region')
+            for i, v in enumerate(pivot_pop['Change'] / 1000):
+                ax1.text(v + 0.05, i, f"{v:.1f}", va='center')
+            st.pyplot(fig1)
+
+            st.markdown(
+                """
+                **Explanation:**  
+                This chart shows the absolute population change in thousands for each region over the last five years.  
+                Positive values indicate population growth, while negative values indicate decline.
+                """
+            )
+
+            # 인구 변화율 그래프
+            fig2, ax2 = plt.subplots(figsize=(10, 6))
+            sns.barplot(x=pivot_pop['ChangeRate'], y=pivot_pop.index, ax=ax2, palette='coolwarm', dodge=False)
+            ax2.set_title('Population Change Rate in Last 5 Years by Region')
+            ax2.set_xlabel('Change Rate (%)')
+            ax2.set_ylabel('Region')
+            for i, v in enumerate(pivot_pop['ChangeRate']):
+                ax2.text(v + (1 if v >= 0 else -3), i, f"{v:.1f}%", va='center')
+            st.pyplot(fig2)
+
+            st.markdown(
+                """
+                **Explanation:**  
+                This chart shows the percentage change in population for each region over the last five years, relative to the population five years ago.  
+                It highlights which regions have experienced the fastest growth or decline proportionally.
+                """
+            )
 
 
 
