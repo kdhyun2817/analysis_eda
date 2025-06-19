@@ -213,11 +213,12 @@ class EDA:
         df = pd.read_csv(uploaded)
 
         # 전처리: '-'를 0으로 대체 (세종 등)
-        sejong_rows = df['행정구역'].astype(str).str.contains("세종", na=False)
+        sejong_rows = df['지역'].astype(str).str.contains("세종", na=False)
         df.loc[sejong_rows] = df.loc[sejong_rows].replace("-", "0")
 
         for col in ['인구', '출생아수(명)', '사망자수(명)']:
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
 
         df['연도'] = pd.to_numeric(df['연도'], errors='coerce')
         df['지역'] = df['지역'].astype(str)
