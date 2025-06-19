@@ -210,9 +210,9 @@ class EDA:
             st.info("Please upload the CSV file.")
             st.stop()
 
-        df = pd.read_csv(uploaded)
+            df = pd.read_csv(uploaded)
 
-        # 전처리: '-'를 0으로 대체 (세종 등)
+        # ✅ 전처리
         sejong_rows = df['지역'].astype(str).str.contains("세종", na=False)
         df.loc[sejong_rows] = df.loc[sejong_rows].replace("-", "0")
 
@@ -223,9 +223,12 @@ class EDA:
         df['연도'] = pd.to_numeric(df['연도'], errors='coerce')
         df['지역'] = df['지역'].astype(str)
 
+        # ✅ 탭 구성
         tabs = st.tabs(["📄 Basic Stats", "📈 Yearly Trend", "📍 Regional Analysis", "🔄 Change Analysis", "📊 Visualization"])
 
-        # 탭 1: 기초 통계
+        # ----------------------------
+        # 📄 TAB 1: Basic Stats
+        # ----------------------------
         with tabs[0]:
             st.subheader("📋 데이터 미리보기 (처음 5행)")
             st.dataframe(df.head(), use_container_width=True)
@@ -239,50 +242,59 @@ class EDA:
             df.info(buf=buffer)
             st.text(buffer.getvalue())
 
-        # 탭 2: 연도별 추이 (전국 기준 + 예측)
+        # ----------------------------
+        # 📈 TAB 2: Yearly Trend (전국 기준 + 예측)
+        # ----------------------------
         with tabs[1]:
-            st.subheader("National Yearly Population Trend + 2035 Forecast")
+            st.subheader("📊 전국 연도별 인구 추이 및 2035년 예측")
             nat = df[df['지역'] == '전국'].copy().dropna(subset=['연도', '인구'])
             nat = nat.sort_values('연도')
 
-            # 예측
-            recent = nat.sort_values('연도', ascending=False).head(3)
-            birth = recent['출생아수(명)'].mean()
-            death = recent['사망자수(명)'].mean()
-            net = birth - death
-            last_year = int(nat['연도'].max())
-            last_pop = nat[nat['연도'] == last_year]['인구'].values[0]
-            forecast_2035 = last_pop + net * (2035 - last_year)
+            if not nat.empty:
+                recent = nat.sort_values('연도', ascending=False).head(3)
+                birth = recent['출생아수(명)'].mean()
+                death = recent['사망자수(명)'].mean()
+                net = birth - death
+                last_year = int(nat['연도'].max())
+                last_pop = nat[nat['연도'] == last_year]['인구'].values[0]
+                forecast_2035 = last_pop + net * (2035 - last_year)
 
-            fig, ax = plt.subplots()
-            ax.plot(nat['연도'], nat['인구'], marker='o', label="Actual")
-            ax.scatter(2035, forecast_2035, color="red", label="Predicted 2035")
-            ax.text(2035, forecast_2035, f"{int(forecast_2035):,}", ha='center', va='bottom')
-            ax.set_title("National Population Trend")
-            ax.set_xlabel("Year")
-            ax.set_ylabel("Population")
-            ax.legend()
-            st.pyplot(fig)
+                fig, ax = plt.subplots()
+                ax.plot(nat['연도'], nat['인구'], marker='o', label="실측치")
+                ax.scatter(2035, forecast_2035, color="red", label="2035 예측")
+                ax.text(2035, forecast_2035, f"{int(forecast_2035):,}", ha='center', va='bottom')
+                ax.set_title("전국 인구 추이")
+                ax.set_xlabel("연도")
+                ax.set_ylabel("인구 수")
+                ax.legend()
+                st.pyplot(fig)
+            else:
+                st.warning("전국 데이터가 없습니다.")
 
-        # 탭 3: 지역별 분석
+        # ----------------------------
+        # 📍 TAB 3: Regional Analysis
+        # ----------------------------
         with tabs[2]:
-            st.subheader("Regional Population/Birth/Death Trends")
+            st.subheader("🗺️ 지역별 인구 / 출생 / 사망 추이")
             regions = sorted(df['지역'].unique())
-            region = st.selectbox("Select Region", [r for r in regions if r != '전국'])
+            region = st.selectbox("지역 선택", [r for r in regions if r != '전국'])
+
             reg_df = df[df['지역'] == region]
             fig, ax = plt.subplots()
-            ax.plot(reg_df['연도'], reg_df['인구'], label='Population')
-            ax.plot(reg_df['연도'], reg_df['출생아수(명)'], label='Births')
-            ax.plot(reg_df['연도'], reg_df['사망자수(명)'], label='Deaths')
-            ax.set_title(f"Trends in {region}")
-            ax.set_xlabel("Year")
-            ax.set_ylabel("Count")
+            ax.plot(reg_df['연도'], reg_df['인구'], label='인구', marker='o')
+            ax.plot(reg_df['연도'], reg_df['출생아수(명)'], label='출생아수', linestyle='--')
+            ax.plot(reg_df['연도'], reg_df['사망자수(명)'], label='사망자수', linestyle='-.')
+            ax.set_title(f"{region} 지역 추이")
+            ax.set_xlabel("연도")
+            ax.set_ylabel("인구 / 출생 / 사망")
             ax.legend()
             st.pyplot(fig)
 
-        # 탭 4: 변화량 분석
+        # ----------------------------
+        # 🔄 TAB 4: Change Analysis
+        # ----------------------------
         with tabs[3]:
-            st.subheader("Top 100 Population Changes by Region-Year")
+            st.subheader("📉 지역별 연도간 인구 변화량 상위 100건")
             df_local = df[df['지역'] != '전국'].copy()
             df_local = df_local.sort_values(['지역', '연도'])
             df_local['증감'] = df_local.groupby('지역')['인구'].diff()
@@ -290,7 +302,7 @@ class EDA:
 
             def highlight(val):
                 try:
-                    v = float(val.replace(",", ""))
+                    v = float(str(val).replace(",", ""))
                     if v > 0:
                         return "background-color: rgba(0, 102, 255, 0.2);"
                     else:
@@ -300,13 +312,16 @@ class EDA:
 
             top100['인구'] = top100['인구'].apply(lambda x: f"{int(x):,}")
             top100['증감'] = top100['증감'].apply(lambda x: f"{int(x):,}")
-
             styled = top100[['연도', '지역', '인구', '증감']].style.applymap(highlight, subset=['증감'])
+
             st.dataframe(styled, use_container_width=True)
 
-        # 탭 5: 시각화
+        # ----------------------------
+        # 📊 TAB 5: Visualization (Stacked Area)
+        # ----------------------------
         with tabs[4]:
-            st.subheader("Stacked Area Chart by Region")
+            st.subheader("📈 지역별 인구 누적 변화 (Stacked Area Chart)")
+
             region_dict = {
                 "서울": "Seoul", "부산": "Busan", "대구": "Daegu", "인천": "Incheon", "광주": "Gwangju",
                 "대전": "Daejeon", "울산": "Ulsan", "세종": "Sejong", "경기": "Gyeonggi", "강원": "Gangwon",
@@ -319,14 +334,16 @@ class EDA:
             pivot = df_viz.pivot_table(index='Region_EN', columns='연도', values='인구', aggfunc='mean').fillna(0)
             pivot = pivot.sort_index(axis=1)
             pivot_T = pivot.transpose()
+
             fig, ax = plt.subplots(figsize=(12, 6))
             colors = sns.color_palette("tab20", n_colors=len(pivot_T.columns))
             pivot_T.plot.area(ax=ax, stacked=True, color=colors)
-            ax.set_title("Stacked Population Trend by Region")
-            ax.set_xlabel("Year")
-            ax.set_ylabel("Population")
+            ax.set_title("지역별 인구 추이 (누적 면적 차트)")
+            ax.set_xlabel("연도")
+            ax.set_ylabel("인구 수")
             ax.legend(loc='upper left', bbox_to_anchor=(1.0, 1.0), title="Region")
             st.pyplot(fig)
+
 
 
 # ---------------------
