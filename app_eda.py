@@ -306,7 +306,7 @@ class EDA:
 
         # 탭 5: 시각화
         with tabs[4]:
-            st.subheader("Bar Chart by Region")
+            st.subheader("Bar Chart by Region and Year")
 
             region_dict = {
                 "서울": "Seoul", "부산": "Busan", "대구": "Daegu", "인천": "Incheon", "광주": "Gwangju",
@@ -319,18 +319,19 @@ class EDA:
             df_viz['Region_EN'] = df_viz['지역'].map(region_dict)
             pivot = df_viz.pivot_table(index='Region_EN', columns='연도', values='인구', aggfunc='mean').fillna(0)
             pivot = pivot.sort_index(axis=1)
-            pivot_T = pivot.transpose()
 
-            fig, ax = plt.subplots(figsize=(12, 6))
-            colors = sns.color_palette("tab20", n_colors=len(pivot_T.columns))
-            pivot_T.plot.bar(ax=ax, stacked=True, color=colors)  # area → bar, stacked 유지
+            fig, ax = plt.subplots(figsize=(14, 7))
+            colors = sns.color_palette("tab20", n_colors=len(pivot.columns))
+            pivot.plot.bar(ax=ax, stacked=False, color=colors)  # stacked=False로 그룹 막대그래프
 
-            ax.set_title("Stacked Bar Chart of Population by Region")
-            ax.set_xlabel("Year")
+            ax.set_title("Population by Region and Year (Grouped Bar Chart)")
+            ax.set_xlabel("Region")
             ax.set_ylabel("Population")
-            ax.legend(loc='upper left', bbox_to_anchor=(1.0, 1.0), title="Region")
+            ax.legend(title="Year", bbox_to_anchor=(1.05, 1), loc='upper left')
+            plt.xticks(rotation=45)
 
             st.pyplot(fig)
+
 
 
 
