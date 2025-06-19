@@ -210,7 +210,7 @@ class EDA:
             st.info("Please upload the CSV file.")
             st.stop()
 
-            df = pd.read_csv(uploaded)
+        df = pd.read_csv(uploaded)
 
         # ✅ 전처리
         sejong_rows = df['지역'].astype(str).str.contains("세종", na=False)
