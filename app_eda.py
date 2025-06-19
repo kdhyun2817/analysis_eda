@@ -212,11 +212,12 @@ class EDA:
 
         df = pd.read_csv(uploaded)
 
-        # 전처리: '-'를 0으로 대체 (세종 등)
-        sejong_rows = df['지역'].astype(str).str.contains("세종", na=False)
-        df.loc[sejong_rows] = df.loc[sejong_rows].replace("-", "0")
+        # --- 전처리 ---
+        sejong_mask = df['지역'].astype(str).str.contains("세종", na=False)
+        df.loc[sejong_mask, :] = df.loc[sejong_mask, :].replace("-", "0")
 
-        for col in ['인구', '출생아수(명)', '사망자수(명)']:
+        cols_to_numeric = ['인구', '출생아수(명)', '사망자수(명)']
+        for col in cols_to_numeric:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
 
@@ -225,46 +226,53 @@ class EDA:
 
         tabs = st.tabs(["📄 Basic Stats", "📈 Yearly Trend", "📍 Regional Analysis", "🔄 Change Analysis", "📊 Visualization"])
 
-        # 탭 1: 기초 통계
+        # 탭 0: 기본 통계 및 데이터 구조
         with tabs[0]:
-            st.subheader("📋 데이터 미리보기 (처음 5행)")
+            st.subheader("Data Preview (first 5 rows)")
             st.dataframe(df.head(), use_container_width=True)
 
-            st.subheader("📈 요약 통계 (`df.describe()`)")
-            desc = df.describe(include='all').transpose()
-            st.dataframe(desc, use_container_width=True)
+            st.subheader("Summary Statistics (df.describe())")
+            st.dataframe(df.describe(include='all').transpose(), use_container_width=True)
 
-            st.subheader("🧾 데이터 구조 (`df.info()`)")
+            st.subheader("DataFrame Info (df.info())")
             buffer = io.StringIO()
             df.info(buf=buffer)
-            st.text(buffer.getvalue())
+            s = buffer.getvalue()
+            st.text(s)
 
-        # 탭 2: 연도별 추이 (전국 기준 + 예측)
+        # 탭 1: 전국 인구 추이 + 2035년 예측
         with tabs[1]:
-            st.subheader("National Yearly Population Trend + 2035 Forecast")
-            nat = df[df['지역'] == '전국'].copy().dropna(subset=['연도', '인구'])
-            nat = nat.sort_values('연도')
+            st.subheader("National Population Trend and 2035 Forecast")
+            nat = df[df['지역'] == '전국'].copy()
 
-            # 예측
+            nat['연도'] = pd.to_numeric(nat['연도'], errors='coerce')
+            nat['인구'] = pd.to_numeric(nat['인구'], errors='coerce')
+            nat['출생아수(명)'] = pd.to_numeric(nat.get('출생아수(명)', 0), errors='coerce').fillna(0)
+            nat['사망자수(명)'] = pd.to_numeric(nat.get('사망자수(명)', 0), errors='coerce').fillna(0)
+
+            nat = nat.dropna(subset=['연도', '인구']).sort_values('연도')
+
             recent = nat.sort_values('연도', ascending=False).head(3)
-            birth = recent['출생아수(명)'].mean()
-            death = recent['사망자수(명)'].mean()
-            net = birth - death
-            last_year = int(nat['연도'].max())
-            last_pop = nat[nat['연도'] == last_year]['인구'].values[0]
-            forecast_2035 = last_pop + net * (2035 - last_year)
+            avg_birth = recent['출생아수(명)'].mean()
+            avg_death = recent['사망자수(명)'].mean()
+
+            last_year = nat['연도'].max()
+            last_pop = nat.loc[nat['연도'] == last_year, '인구'].values[0]
+
+            years_to_2035 = 2035 - last_year
+            forecast_pop = last_pop + (avg_birth - avg_death) * years_to_2035
 
             fig, ax = plt.subplots()
-            ax.plot(nat['연도'], nat['인구'], marker='o', label="Actual")
-            ax.scatter(2035, forecast_2035, color="red", label="Predicted 2035")
-            ax.text(2035, forecast_2035, f"{int(forecast_2035):,}", ha='center', va='bottom')
+            ax.plot(nat['연도'], nat['인구'], marker='o', label="Actual Population")
+            ax.scatter(2035, forecast_pop, color="red", label="Predicted Population 2035")
+            ax.text(2035, forecast_pop, f"{int(forecast_pop):,}", ha='center', va='bottom', color='red')
             ax.set_title("National Population Trend")
             ax.set_xlabel("Year")
             ax.set_ylabel("Population")
             ax.legend()
             st.pyplot(fig)
 
-        # 탭 3: 지역별 분석
+        # 탭 2: 지역별 분석 (기존 내용 유지)
         with tabs[2]:
             st.subheader("Regional Population/Birth/Death Trends")
             regions = sorted(df['지역'].unique())
@@ -280,31 +288,35 @@ class EDA:
             ax.legend()
             st.pyplot(fig)
 
-        # 탭 4: 변화량 분석
+        # 탭 3: 인구 증감 상위 100 사례 + 컬러 강조
         with tabs[3]:
             st.subheader("Top 100 Population Changes by Region-Year")
+
             df_local = df[df['지역'] != '전국'].copy()
             df_local = df_local.sort_values(['지역', '연도'])
             df_local['증감'] = df_local.groupby('지역')['인구'].diff()
-            top100 = df_local.dropna(subset=['증감']).nlargest(100, columns='증감', keep='all')
 
-            def highlight(val):
-                try:
-                    v = float(val.replace(",", ""))
-                    if v > 0:
-                        return "background-color: rgba(0, 102, 255, 0.2);"
-                    else:
-                        return "background-color: rgba(255, 0, 0, 0.2);"
-                except:
-                    return ""
+            top100 = df_local.dropna(subset=['증감']).nlargest(100, columns='증감', keep='all')
 
             top100['인구'] = top100['인구'].apply(lambda x: f"{int(x):,}")
             top100['증감'] = top100['증감'].apply(lambda x: f"{int(x):,}")
 
-            styled = top100[['연도', '지역', '인구', '증감']].style.applymap(highlight, subset=['증감'])
-            st.dataframe(styled, use_container_width=True)
+            def highlight_change(val):
+                try:
+                    v = float(val.replace(",", ""))
+                    if v > 0:
+                        return "background-color: rgba(0, 102, 255, 0.2);"  # 연한 파랑
+                    elif v < 0:
+                        return "background-color: rgba(255, 0, 0, 0.2);"    # 연한 빨강
+                    else:
+                        return ""
+                except:
+                    return ""
 
-        # 탭 5: 시각화
+            styled_df = top100[['연도', '지역', '인구', '증감']].style.applymap(highlight_change, subset=['증감'])
+            st.dataframe(styled_df, use_container_width=True)
+
+        # 탭 4: 최근 5년 인구 변화량 및 변화율 그래프
         with tabs[4]:
             st.subheader("Population Change Analysis in Last 5 Years by Region")
 
