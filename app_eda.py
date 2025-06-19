@@ -7,6 +7,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+font_path = "C:/Windows/Fonts/malgun.ttf"  # 윈도우 '맑은 고딕' 폰트 경로
+font_name = fm.FontProperties(fname=font_path).get_name()
+plt.rcParams['font.family'] = font_name
+plt.rcParams['axes.unicode_minus'] = False
+
 # ---------------------
 # Firebase 설정
 # ---------------------
