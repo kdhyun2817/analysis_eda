@@ -227,16 +227,17 @@ class EDA:
 
         # 탭 1: 기초 통계
         with tabs[0]:
-            st.subheader("Basic Data Overview")
-            st.dataframe(df.head())
+            st.subheader("📋 데이터 미리보기 (처음 5행)")
+            st.dataframe(df.head(), use_container_width=True)
 
-            st.subheader("df.info()")
-            buf = io.StringIO()
-            df.info(buf=buf)
-            st.text(buf.getvalue())
+            st.subheader("📈 요약 통계 (`df.describe()`)")
+            desc = df.describe(include='all').transpose()
+            st.dataframe(desc, use_container_width=True)
 
-            st.subheader("df.describe()")
-            st.dataframe(df.describe())
+            st.subheader("🧾 데이터 구조 (`df.info()`)")
+            buffer = io.StringIO()
+            df.info(buf=buffer)
+            st.text(buffer.getvalue())
 
         # 탭 2: 연도별 추이 (전국 기준 + 예측)
         with tabs[1]:
