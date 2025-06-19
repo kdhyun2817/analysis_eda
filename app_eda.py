@@ -212,7 +212,7 @@ class EDA:
 
         df = pd.read_csv(uploaded)
 
-        # --- 전처리 ---
+        # --- Preprocessing ---
         sejong_mask = df['지역'].astype(str).str.contains("세종", na=False)
         df.loc[sejong_mask, :] = df.loc[sejong_mask, :].replace("-", "0")
 
@@ -226,7 +226,7 @@ class EDA:
 
         tabs = st.tabs(["📄 Basic Stats", "📈 Yearly Trend", "📍 Regional Analysis", "🔄 Change Analysis", "📊 Visualization"])
 
-        # 탭 0: 기본 통계 및 데이터 구조
+        # Tab 0: Basic Stats and Info
         with tabs[0]:
             st.subheader("Data Preview (first 5 rows)")
             st.dataframe(df.head(), use_container_width=True)
@@ -240,7 +240,7 @@ class EDA:
             s = buffer.getvalue()
             st.text(s)
 
-        # 탭 1: 전국 인구 추이 + 2035년 예측
+        # Tab 1: National Population Trend + 2035 Forecast
         with tabs[1]:
             st.subheader("National Population Trend and 2035 Forecast")
             nat = df[df['지역'] == '전국'].copy()
@@ -272,9 +272,9 @@ class EDA:
             ax.legend()
             st.pyplot(fig)
 
-        # 탭 2: 지역별 분석 (기존 내용 유지)
+        # Tab 2: Regional Analysis
         with tabs[2]:
-            st.subheader("Regional Population/Birth/Death Trends")
+            st.subheader("Regional Population, Births, Deaths Trends")
             regions = sorted(df['지역'].unique())
             region = st.selectbox("Select Region", [r for r in regions if r != '전국'])
             reg_df = df[df['지역'] == region]
@@ -288,37 +288,37 @@ class EDA:
             ax.legend()
             st.pyplot(fig)
 
-        # 탭 3: 인구 증감 상위 100 사례 + 컬러 강조
+        # Tab 3: Top 100 Population Changes
         with tabs[3]:
             st.subheader("Top 100 Population Changes by Region-Year")
 
             df_local = df[df['지역'] != '전국'].copy()
             df_local = df_local.sort_values(['지역', '연도'])
-            df_local['증감'] = df_local.groupby('지역')['인구'].diff()
+            df_local['Change'] = df_local.groupby('지역')['인구'].diff()
 
-            top100 = df_local.dropna(subset=['증감']).nlargest(100, columns='증감', keep='all')
+            top100 = df_local.dropna(subset=['Change']).nlargest(100, columns='Change', keep='all')
 
             top100['인구'] = top100['인구'].apply(lambda x: f"{int(x):,}")
-            top100['증감'] = top100['증감'].apply(lambda x: f"{int(x):,}")
+            top100['Change'] = top100['Change'].apply(lambda x: f"{int(x):,}")
 
             def highlight_change(val):
                 try:
                     v = float(val.replace(",", ""))
                     if v > 0:
-                        return "background-color: rgba(0, 102, 255, 0.2);"  # 연한 파랑
+                        return "background-color: rgba(0, 102, 255, 0.2);"  # Light Blue
                     elif v < 0:
-                        return "background-color: rgba(255, 0, 0, 0.2);"    # 연한 빨강
+                        return "background-color: rgba(255, 0, 0, 0.2);"    # Light Red
                     else:
                         return ""
                 except:
                     return ""
 
-            styled_df = top100[['연도', '지역', '인구', '증감']].style.applymap(highlight_change, subset=['증감'])
+            styled_df = top100[['연도', '지역', '인구', 'Change']].style.applymap(highlight_change, subset=['Change'])
             st.dataframe(styled_df, use_container_width=True)
 
-        # 탭 4: 최근 5년 인구 변화량 및 변화율 그래프
+        # Tab 4: Population Change & Rate in Last 5 Years
         with tabs[4]:
-            st.subheader("Population Change Analysis in Last 5 Years by Region")
+            st.subheader("Population Change in Last 5 Years by Region")
 
             region_dict = {
                 "서울": "Seoul", "부산": "Busan", "대구": "Daegu", "인천": "Incheon", "광주": "Gwangju",
@@ -342,11 +342,11 @@ class EDA:
 
             pivot_pop = pivot_pop.sort_values(by='Change', ascending=False)
 
-            # 인구 변화량 그래프
+            # Population Change Barplot
             fig1, ax1 = plt.subplots(figsize=(10, 6))
             sns.barplot(x=pivot_pop['Change'] / 1000, y=pivot_pop.index, ax=ax1, palette='viridis')
-            ax1.set_title('Population Change in Last 5 Years by Region')
-            ax1.set_xlabel('Population Change (thousands)')
+            ax1.set_title('Population Change Last 5 Years')
+            ax1.set_xlabel('Change (thousands)')
             ax1.set_ylabel('Region')
             for i, v in enumerate(pivot_pop['Change'] / 1000):
                 ax1.text(v + 0.05, i, f"{v:.1f}", va='center')
@@ -356,14 +356,14 @@ class EDA:
                 """
                 **Explanation:**  
                 This chart shows the absolute population change in thousands for each region over the last five years.  
-                Positive values indicate population growth, while negative values indicate decline.
+                Positive values indicate growth, negative values indicate decline.
                 """
             )
 
-            # 인구 변화율 그래프
+            # Population Change Rate Barplot
             fig2, ax2 = plt.subplots(figsize=(10, 6))
             sns.barplot(x=pivot_pop['ChangeRate'], y=pivot_pop.index, ax=ax2, palette='coolwarm', dodge=False)
-            ax2.set_title('Population Change Rate in Last 5 Years by Region')
+            ax2.set_title('Population Change Rate Last 5 Years')
             ax2.set_xlabel('Change Rate (%)')
             ax2.set_ylabel('Region')
             for i, v in enumerate(pivot_pop['ChangeRate']):
@@ -373,10 +373,11 @@ class EDA:
             st.markdown(
                 """
                 **Explanation:**  
-                This chart shows the percentage change in population for each region over the last five years, relative to the population five years ago.  
-                It highlights which regions have experienced the fastest growth or decline proportionally.
+                This chart shows the percentage change in population for each region over the last five years relative to the population five years ago.  
+                It highlights which regions experienced the fastest proportional growth or decline.
                 """
             )
+
 
 
 
